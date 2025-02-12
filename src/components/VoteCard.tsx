@@ -154,8 +154,8 @@ export const VoteCard = ({
       <h3 className="text-lg font-semibold mb-2">{title}</h3>
       <p className="text-gray-600 mb-4">{description}</p>
 
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant={userVote === "up" ? "default" : "outline"}
             size="sm"
@@ -191,7 +191,7 @@ export const VoteCard = ({
           <Button
             variant="outline"
             size="sm"
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 w-full sm:w-auto justify-center"
             onClick={() => window.open(tiktokUrl, "_blank")}
           >
             <ExternalLink className="h-4 w-4" />
