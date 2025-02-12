@@ -11,7 +11,7 @@ const Index = () => {
       description: "O prefeito afirma ter finalizado a reforma da praça central com novos bancos e iluminação.",
       upvotes: 150,
       downvotes: 30,
-      tiktokUrl: "https://www.tiktok.com/@prefeiturasorocaba",
+      tiktokUrl: "https://www.tiktok.com/@rodrigomangaoficial",
     },
     {
       id: "2",
@@ -19,7 +19,7 @@ const Index = () => {
       description: "Implementação de um novo sistema de monitoramento em tempo real para ônibus municipais.",
       upvotes: 200,
       downvotes: 45,
-      tiktokUrl: "https://www.tiktok.com/@prefeiturasorocaba",
+      tiktokUrl: "https://www.tiktok.com/@rodrigomangaoficial",
     },
   ];
 
