@@ -1,8 +1,8 @@
-
 import { ThumbsUp, ThumbsDown, MessageSquare, ExternalLink } from "lucide-react";
 import { Button } from "./ui/button";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Textarea } from "./ui/textarea";
+import { toast } from "@/hooks/use-toast";
 
 interface Comment {
   id: number;
@@ -18,6 +18,7 @@ interface VoteCardProps {
   tiktokUrl?: string;
   upvotes: number;
   downvotes: number;
+  id: string; // Adicionado ID único para cada tópico
 }
 
 export const VoteCard = ({
@@ -26,39 +27,57 @@ export const VoteCard = ({
   tiktokUrl,
   upvotes: initialUpvotes,
   downvotes: initialDownvotes,
+  id,
 }: VoteCardProps) => {
   const [upvotes, setUpvotes] = useState(initialUpvotes);
   const [downvotes, setDownvotes] = useState(initialDownvotes);
   const [showComments, setShowComments] = useState(false);
-  const [userVote, setUserVote] = useState<"up" | "down" | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
 
+  // Carregar voto do usuário do localStorage
+  const [userVote, setUserVote] = useState<"up" | "down" | null>(() => {
+    const savedVote = localStorage.getItem(`vote_${id}`);
+    return savedVote as "up" | "down" | null;
+  });
+
   const handleVote = (type: "up" | "down") => {
-    if (userVote === type) {
+    // Verifica se já votou neste tópico
+    const savedVote = localStorage.getItem(`vote_${id}`);
+    
+    if (savedVote === type) {
       // Remove o voto
+      localStorage.removeItem(`vote_${id}`);
       setUserVote(null);
       if (type === "up") {
         setUpvotes((prev) => prev - 1);
       } else {
         setDownvotes((prev) => prev - 1);
       }
-    } else {
-      // Se já votou no outro botão, remove o voto anterior
-      if (userVote) {
-        if (userVote === "up") {
-          setUpvotes((prev) => prev - 1);
-        } else {
-          setDownvotes((prev) => prev - 1);
-        }
-      }
-      // Adiciona o novo voto
+      toast({
+        title: "Voto removido",
+        description: "Seu voto foi removido com sucesso.",
+      });
+    } else if (!savedVote) {
+      // Adiciona novo voto
+      localStorage.setItem(`vote_${id}`, type);
       setUserVote(type);
       if (type === "up") {
         setUpvotes((prev) => prev + 1);
       } else {
         setDownvotes((prev) => prev + 1);
       }
+      toast({
+        title: "Voto registrado",
+        description: "Seu voto foi registrado com sucesso.",
+      });
+    } else {
+      // Usuário já votou neste tópico
+      toast({
+        title: "Não é possível votar novamente",
+        description: "Você já votou neste tópico. Remova seu voto anterior primeiro.",
+        variant: "destructive",
+      });
     }
   };
 

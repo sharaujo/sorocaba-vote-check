@@ -6,7 +6,7 @@ const Index = () => {
   // Dados de exemplo - serão substituídos por dados reais do backend
   const sampleChanges = [
     {
-      id: 1,
+      id: "1",
       title: "Reforma da Praça Central",
       description: "O prefeito afirma ter finalizado a reforma da praça central com novos bancos e iluminação.",
       upvotes: 150,
@@ -14,7 +14,7 @@ const Index = () => {
       tiktokUrl: "https://www.tiktok.com/@prefeiturasorocaba",
     },
     {
-      id: 2,
+      id: "2",
       title: "Novo Sistema de Ônibus",
       description: "Implementação de um novo sistema de monitoramento em tempo real para ônibus municipais.",
       upvotes: 200,
@@ -38,6 +38,7 @@ const Index = () => {
           {sampleChanges.map((change) => (
             <VoteCard
               key={change.id}
+              id={change.id}
               title={change.title}
               description={change.description}
               upvotes={change.upvotes}
