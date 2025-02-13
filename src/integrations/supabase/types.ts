@@ -9,7 +9,101 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      admin_logs: {
+        Row: {
+          action: string
+          created_at: string
+          details: Json | null
+          entity_id: string
+          entity_type: string
+          id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          details?: Json | null
+          entity_id: string
+          entity_type: string
+          id?: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          details?: Json | null
+          entity_id?: string
+          entity_type?: string
+          id?: string
+        }
+        Relationships: []
+      }
+      comments: {
+        Row: {
+          created_at: string
+          downvotes: number | null
+          id: string
+          text: string
+          topic_id: string | null
+          upvotes: number | null
+        }
+        Insert: {
+          created_at?: string
+          downvotes?: number | null
+          id?: string
+          text: string
+          topic_id?: string | null
+          upvotes?: number | null
+        }
+        Update: {
+          created_at?: string
+          downvotes?: number | null
+          id?: string
+          text?: string
+          topic_id?: string | null
+          upvotes?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comments_topic_id_fkey"
+            columns: ["topic_id"]
+            isOneToOne: false
+            referencedRelation: "topics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      topics: {
+        Row: {
+          created_at: string
+          description: string
+          downvotes: number | null
+          id: string
+          tiktok_url: string | null
+          title: string
+          updated_at: string
+          upvotes: number | null
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          downvotes?: number | null
+          id?: string
+          tiktok_url?: string | null
+          title: string
+          updated_at?: string
+          upvotes?: number | null
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          downvotes?: number | null
+          id?: string
+          tiktok_url?: string | null
+          title?: string
+          updated_at?: string
+          upvotes?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

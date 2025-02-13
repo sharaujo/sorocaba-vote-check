@@ -1,13 +1,23 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Navigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
-import { Trash2, LogOut } from "lucide-react";
+import { Trash2, LogOut, Plus } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 const ADMIN_USER = "admin";
 const ADMIN_PASS = "sorocaba2024";
+
+type Topic = {
+  id: string;
+  title: string;
+  description: string;
+  tiktok_url: string | null;
+  created_at: string;
+};
 
 const Admin = () => {
   const [username, setUsername] = useState("");
@@ -15,6 +25,36 @@ const Admin = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     return localStorage.getItem("adminAuth") === "true";
   });
+  const [topics, setTopics] = useState<Topic[]>([]);
+  const [newTopic, setNewTopic] = useState({ title: "", description: "", tiktok_url: "" });
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchTopics();
+    }
+  }, [isAuthenticated]);
+
+  const fetchTopics = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("topics")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setTopics(data || []);
+    } catch (error) {
+      console.error("Error fetching topics:", error);
+      toast({
+        title: "Erro ao carregar tópicos",
+        description: "Não foi possível carregar os tópicos. Tente novamente mais tarde.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,12 +83,77 @@ const Admin = () => {
     });
   };
 
-  const handleDeleteTopic = (id: string) => {
-    // Implementar lógica de deleção
-    toast({
-      title: "Tópico removido",
-      description: "O tópico foi removido com sucesso.",
-    });
+  const handleAddTopic = async () => {
+    if (!newTopic.title.trim() || !newTopic.description.trim()) {
+      toast({
+        title: "Campos obrigatórios",
+        description: "Título e descrição são obrigatórios.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("topics")
+        .insert([newTopic])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      await supabase.from("admin_logs").insert([
+        {
+          action: "create",
+          entity_type: "topic",
+          entity_id: data.id,
+          details: { topic: data },
+        },
+      ]);
+
+      setTopics([data, ...topics]);
+      setNewTopic({ title: "", description: "", tiktok_url: "" });
+      toast({
+        title: "Tópico adicionado",
+        description: "O tópico foi adicionado com sucesso.",
+      });
+    } catch (error) {
+      console.error("Error adding topic:", error);
+      toast({
+        title: "Erro ao adicionar tópico",
+        description: "Não foi possível adicionar o tópico. Tente novamente mais tarde.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteTopic = async (id: string) => {
+    try {
+      const { error } = await supabase.from("topics").delete().eq("id", id);
+      if (error) throw error;
+
+      await supabase.from("admin_logs").insert([
+        {
+          action: "delete",
+          entity_type: "topic",
+          entity_id: id,
+          details: { topic_id: id },
+        },
+      ]);
+
+      setTopics(topics.filter((topic) => topic.id !== id));
+      toast({
+        title: "Tópico removido",
+        description: "O tópico foi removido com sucesso.",
+      });
+    } catch (error) {
+      console.error("Error deleting topic:", error);
+      toast({
+        title: "Erro ao remover tópico",
+        description: "Não foi possível remover o tópico. Tente novamente mais tarde.",
+        variant: "destructive",
+      });
+    }
   };
 
   if (!isAuthenticated) {
@@ -93,39 +198,66 @@ const Admin = () => {
           </Button>
         </div>
 
+        <div className="bg-white rounded-lg shadow p-6 mb-6">
+          <h2 className="text-xl font-semibold mb-4">Adicionar Novo Tópico</h2>
+          <div className="space-y-4">
+            <Input
+              placeholder="Título"
+              value={newTopic.title}
+              onChange={(e) => setNewTopic({ ...newTopic, title: e.target.value })}
+            />
+            <Textarea
+              placeholder="Descrição"
+              value={newTopic.description}
+              onChange={(e) => setNewTopic({ ...newTopic, description: e.target.value })}
+            />
+            <Input
+              placeholder="URL do TikTok (opcional)"
+              value={newTopic.tiktok_url || ""}
+              onChange={(e) => setNewTopic({ ...newTopic, tiktok_url: e.target.value })}
+            />
+            <Button onClick={handleAddTopic} className="flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              Adicionar Tópico
+            </Button>
+          </div>
+        </div>
+
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-xl font-semibold mb-4">Tópicos</h2>
-          <div className="space-y-4">
-            {/* Lista de tópicos */}
-            {[
-              {
-                id: "1",
-                title: "Reforma da Praça Central",
-                description: "O prefeito afirma ter finalizado a reforma da praça central com novos bancos e iluminação.",
-              },
-              {
-                id: "2",
-                title: "Novo Sistema de Ônibus",
-                description: "Implementação de um novo sistema de monitoramento em tempo real para ônibus municipais.",
-              },
-            ].map((topic) => (
-              <div key={topic.id} className="flex items-start justify-between p-4 bg-gray-50 rounded-lg">
-                <div>
-                  <h3 className="font-semibold">{topic.title}</h3>
-                  <p className="text-gray-600 text-sm">{topic.description}</p>
+          {isLoading ? (
+            <p className="text-center text-gray-500">Carregando tópicos...</p>
+          ) : (
+            <div className="space-y-4">
+              {topics.map((topic) => (
+                <div key={topic.id} className="flex items-start justify-between p-4 bg-gray-50 rounded-lg">
+                  <div>
+                    <h3 className="font-semibold">{topic.title}</h3>
+                    <p className="text-gray-600 text-sm">{topic.description}</p>
+                    {topic.tiktok_url && (
+                      <a
+                        href={topic.tiktok_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-500 text-sm hover:underline"
+                      >
+                        Ver no TikTok
+                      </a>
+                    )}
+                  </div>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => handleDeleteTopic(topic.id)}
+                    className="flex items-center gap-2"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Remover
+                  </Button>
                 </div>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => handleDeleteTopic(topic.id)}
-                  className="flex items-center gap-2"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Remover
-                </Button>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
