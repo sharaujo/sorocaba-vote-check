@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
-import { Trash2, LogOut, Plus } from "lucide-react";
+import { Trash2, LogOut, Plus, MessageSquare } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 const ADMIN_USER = "admin";
@@ -19,6 +19,14 @@ type Topic = {
   created_at: string;
 };
 
+type Comment = {
+  id: string;
+  text: string;
+  user_name: string;
+  created_at: string;
+  topic_id: string;
+};
+
 const Admin = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -28,12 +36,20 @@ const Admin = () => {
   const [topics, setTopics] = useState<Topic[]>([]);
   const [newTopic, setNewTopic] = useState({ title: "", description: "", tiktok_url: "" });
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
+  const [comments, setComments] = useState<Comment[]>([]);
 
   useEffect(() => {
     if (isAuthenticated) {
       fetchTopics();
     }
   }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (selectedTopicId) {
+      fetchComments(selectedTopicId);
+    }
+  }, [selectedTopicId]);
 
   const fetchTopics = async () => {
     try {
@@ -53,6 +69,26 @@ const Admin = () => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchComments = async (topicId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("comments")
+        .select("*")
+        .eq("topic_id", topicId)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setComments(data || []);
+    } catch (error) {
+      console.error("Error fetching comments:", error);
+      toast({
+        title: "Erro ao carregar comentários",
+        description: "Não foi possível carregar os comentários. Tente novamente mais tarde.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -142,6 +178,10 @@ const Admin = () => {
       ]);
 
       setTopics(topics.filter((topic) => topic.id !== id));
+      if (selectedTopicId === id) {
+        setSelectedTopicId(null);
+        setComments([]);
+      }
       toast({
         title: "Tópico removido",
         description: "O tópico foi removido com sucesso.",
@@ -151,6 +191,30 @@ const Admin = () => {
       toast({
         title: "Erro ao remover tópico",
         description: "Não foi possível remover o tópico. Tente novamente mais tarde.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    try {
+      const { error } = await supabase
+        .from("comments")
+        .delete()
+        .eq("id", commentId);
+
+      if (error) throw error;
+
+      setComments(comments.filter((comment) => comment.id !== commentId));
+      toast({
+        title: "Comentário removido",
+        description: "O comentário foi removido com sucesso.",
+      });
+    } catch (error) {
+      console.error("Error deleting comment:", error);
+      toast({
+        title: "Erro ao remover comentário",
+        description: "Não foi possível remover o comentário. Tente novamente mais tarde.",
         variant: "destructive",
       });
     }
@@ -224,36 +288,91 @@ const Admin = () => {
         </div>
 
         <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold mb-4">Tópicos</h2>
+          <h2 className="text-xl font-semibold mb-4">Tópicos e Comentários</h2>
           {isLoading ? (
             <p className="text-center text-gray-500">Carregando tópicos...</p>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-6">
               {topics.map((topic) => (
-                <div key={topic.id} className="flex items-start justify-between p-4 bg-gray-50 rounded-lg">
-                  <div>
-                    <h3 className="font-semibold">{topic.title}</h3>
-                    <p className="text-gray-600 text-sm">{topic.description}</p>
-                    {topic.tiktok_url && (
-                      <a
-                        href={topic.tiktok_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-500 text-sm hover:underline"
+                <div key={topic.id} className="border rounded-lg p-4">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h3 className="font-semibold">{topic.title}</h3>
+                      <p className="text-gray-600 text-sm">{topic.description}</p>
+                      {topic.tiktok_url && (
+                        <a
+                          href={topic.tiktok_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-500 text-sm hover:underline"
+                        >
+                          Ver no TikTok
+                        </a>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (selectedTopicId === topic.id) {
+                            setSelectedTopicId(null);
+                            setComments([]);
+                          } else {
+                            setSelectedTopicId(topic.id);
+                          }
+                        }}
+                        className="flex items-center gap-2"
                       >
-                        Ver no TikTok
-                      </a>
-                    )}
+                        <MessageSquare className="h-4 w-4" />
+                        {selectedTopicId === topic.id ? "Ocultar" : "Ver"} Comentários
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleDeleteTopic(topic.id)}
+                        className="flex items-center gap-2"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Remover
+                      </Button>
+                    </div>
                   </div>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => handleDeleteTopic(topic.id)}
-                    className="flex items-center gap-2"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Remover
-                  </Button>
+
+                  {selectedTopicId === topic.id && (
+                    <div className="mt-4 pl-4 border-l-2 border-gray-200">
+                      <h4 className="font-medium mb-2">Comentários</h4>
+                      {comments.length > 0 ? (
+                        <div className="space-y-3">
+                          {comments.map((comment) => (
+                            <div
+                              key={comment.id}
+                              className="flex items-start justify-between bg-gray-50 p-3 rounded"
+                            >
+                              <div>
+                                <p className="text-sm font-medium">{comment.user_name}</p>
+                                <p className="text-sm text-gray-600">{comment.text}</p>
+                                <p className="text-xs text-gray-400">
+                                  {new Date(comment.created_at).toLocaleString()}
+                                </p>
+                              </div>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => handleDeleteComment(comment.id)}
+                                className="flex items-center gap-1"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                                Remover
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-gray-500 text-sm">Nenhum comentário ainda.</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
