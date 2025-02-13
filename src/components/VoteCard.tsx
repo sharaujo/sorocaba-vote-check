@@ -1,15 +1,19 @@
+
 import { ThumbsUp, ThumbsDown, MessageSquare, ExternalLink } from "lucide-react";
 import { Button } from "./ui/button";
 import { useState, useEffect } from "react";
 import { Textarea } from "./ui/textarea";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Comment {
-  id: number;
+  id: string;
   text: string;
   upvotes: number;
   downvotes: number;
   userVote: "up" | "down" | null;
+  created_at: string;
+  user_name: string;
 }
 
 interface VoteCardProps {
@@ -18,7 +22,7 @@ interface VoteCardProps {
   tiktokUrl?: string;
   upvotes: number;
   downvotes: number;
-  id: string; // Adicionado ID único para cada tópico
+  id: string;
 }
 
 export const VoteCard = ({
@@ -34,12 +38,51 @@ export const VoteCard = ({
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
+  const [isLoadingComments, setIsLoadingComments] = useState(false);
 
   // Carregar voto do usuário do localStorage
   const [userVote, setUserVote] = useState<"up" | "down" | null>(() => {
     const savedVote = localStorage.getItem(`vote_${id}`);
     return savedVote as "up" | "down" | null;
   });
+
+  // Carregar comentários quando showComments for true
+  useEffect(() => {
+    if (showComments) {
+      fetchComments();
+    }
+  }, [showComments]);
+
+  const fetchComments = async () => {
+    if (!showComments) return;
+    
+    setIsLoadingComments(true);
+    try {
+      const { data, error } = await supabase
+        .from("comments")
+        .select("*")
+        .eq("topic_id", id)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      const commentsWithUserVotes = data.map(comment => ({
+        ...comment,
+        userVote: null,
+      }));
+
+      setComments(commentsWithUserVotes);
+    } catch (error) {
+      console.error("Error fetching comments:", error);
+      toast({
+        title: "Erro ao carregar comentários",
+        description: "Não foi possível carregar os comentários. Tente novamente mais tarde.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingComments(false);
+    }
+  };
 
   const handleVote = (type: "up" | "down") => {
     // Verifica se já votou neste tópico
@@ -131,17 +174,42 @@ export const VoteCard = ({
     );
   };
 
-  const handleAddComment = () => {
-    if (newComment.trim()) {
-      const comment: Comment = {
-        id: Date.now(),
-        text: newComment,
-        upvotes: 0,
-        downvotes: 0,
+  const handleAddComment = async () => {
+    if (!newComment.trim()) return;
+
+    try {
+      const { data, error } = await supabase
+        .from("comments")
+        .insert([
+          {
+            topic_id: id,
+            text: newComment.trim(),
+          },
+        ])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      const commentWithUserVote = {
+        ...data,
         userVote: null,
       };
-      setComments((prev) => [...prev, comment]);
+
+      setComments((prev) => [commentWithUserVote, ...prev]);
       setNewComment("");
+      
+      toast({
+        title: "Comentário adicionado",
+        description: "Seu comentário foi adicionado com sucesso.",
+      });
+    } catch (error) {
+      console.error("Error adding comment:", error);
+      toast({
+        title: "Erro ao adicionar comentário",
+        description: "Não foi possível adicionar o comentário. Tente novamente mais tarde.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -218,36 +286,48 @@ export const VoteCard = ({
             </Button>
           </div>
 
-          <div className="space-y-4">
-            {sortedComments.map((comment) => (
-              <div
-                key={comment.id}
-                className="bg-gray-50 rounded p-3 space-y-2"
-              >
-                <p className="text-gray-700">{comment.text}</p>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant={comment.userVote === "up" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => handleCommentVote(comment.id, "up")}
-                    className="flex items-center gap-1"
-                  >
-                    <ThumbsUp className="h-3 w-3" />
-                    <span>{comment.upvotes}</span>
-                  </Button>
-                  <Button
-                    variant={comment.userVote === "down" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => handleCommentVote(comment.id, "down")}
-                    className="flex items-center gap-1"
-                  >
-                    <ThumbsDown className="h-3 w-3" />
-                    <span>{comment.downvotes}</span>
-                  </Button>
+          {isLoadingComments ? (
+            <p className="text-center text-gray-500">Carregando comentários...</p>
+          ) : (
+            <div className="space-y-4">
+              {sortedComments.map((comment) => (
+                <div
+                  key={comment.id}
+                  className="bg-gray-50 rounded p-3 space-y-2"
+                >
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="text-sm font-medium">{comment.user_name}</p>
+                      <p className="text-gray-700">{comment.text}</p>
+                    </div>
+                    <span className="text-xs text-gray-400">
+                      {new Date(comment.created_at).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant={comment.userVote === "up" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => handleCommentVote(Number(comment.id), "up")}
+                      className="flex items-center gap-1"
+                    >
+                      <ThumbsUp className="h-3 w-3" />
+                      <span>{comment.upvotes}</span>
+                    </Button>
+                    <Button
+                      variant={comment.userVote === "down" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => handleCommentVote(Number(comment.id), "down")}
+                      className="flex items-center gap-1"
+                    >
+                      <ThumbsDown className="h-3 w-3" />
+                      <span>{comment.downvotes}</span>
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
