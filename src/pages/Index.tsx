@@ -1,27 +1,26 @@
 
 import { LocationCheck } from "@/components/LocationCheck";
 import { VoteCard } from "@/components/VoteCard";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 
 const Index = () => {
-  // Dados de exemplo - serão substituídos por dados reais do backend
-  const sampleChanges = [
-    {
-      id: "1",
-      title: "Reforma da Praça Central",
-      description: "O prefeito afirma ter finalizado a reforma da praça central com novos bancos e iluminação.",
-      upvotes: 150,
-      downvotes: 30,
-      tiktokUrl: "https://www.tiktok.com/@rodrigomangaoficial",
+  const { data: topics, isLoading } = useQuery({
+    queryKey: ['topics'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('topics')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching topics:', error);
+        throw error;
+      }
+
+      return data;
     },
-    {
-      id: "2",
-      title: "Novo Sistema de Ônibus",
-      description: "Implementação de um novo sistema de monitoramento em tempo real para ônibus municipais.",
-      upvotes: 200,
-      downvotes: 45,
-      tiktokUrl: "https://www.tiktok.com/@rodrigomangaoficial",
-    },
-  ];
+  });
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -35,17 +34,25 @@ const Index = () => {
         </div>
 
         <div className="space-y-4">
-          {sampleChanges.map((change) => (
-            <VoteCard
-              key={change.id}
-              id={change.id}
-              title={change.title}
-              description={change.description}
-              upvotes={change.upvotes}
-              downvotes={change.downvotes}
-              tiktokUrl={change.tiktokUrl}
-            />
-          ))}
+          {isLoading ? (
+            <div className="text-center py-8">Carregando tópicos...</div>
+          ) : topics && topics.length > 0 ? (
+            topics.map((topic) => (
+              <VoteCard
+                key={topic.id}
+                id={topic.id}
+                title={topic.title}
+                description={topic.description}
+                upvotes={topic.upvotes || 0}
+                downvotes={topic.downvotes || 0}
+                tiktokUrl={topic.tiktok_url}
+              />
+            ))
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              Nenhum tópico encontrado.
+            </div>
+          )}
         </div>
       </div>
     </div>
