@@ -8,9 +8,17 @@ const Index = () => {
   const { data: topics, isLoading } = useQuery({
     queryKey: ['topics'],
     queryFn: async () => {
+      // Buscar tópicos com contagem de votos e comentários
       const { data, error } = await supabase
         .from('topics')
-        .select('*')
+        .select(`
+          *,
+          comments (count),
+          votes (
+            vote_type,
+            count
+          )
+        `)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -18,7 +26,21 @@ const Index = () => {
         throw error;
       }
 
-      return data;
+      // Processar os dados para calcular upvotes e downvotes
+      const processedTopics = data.map(topic => {
+        const upvotes = topic.votes?.filter(v => v.vote_type === 'up').length || 0;
+        const downvotes = topic.votes?.filter(v => v.vote_type === 'down').length || 0;
+        const commentCount = topic.comments?.[0]?.count || 0;
+
+        return {
+          ...topic,
+          upvotes,
+          downvotes,
+          commentCount
+        };
+      });
+
+      return processedTopics;
     },
   });
 
@@ -43,8 +65,8 @@ const Index = () => {
                 id={topic.id}
                 title={topic.title}
                 description={topic.description}
-                upvotes={topic.upvotes || 0}
-                downvotes={topic.downvotes || 0}
+                upvotes={topic.upvotes}
+                downvotes={topic.downvotes}
                 tiktokUrl={topic.tiktok_url}
               />
             ))

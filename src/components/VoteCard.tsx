@@ -1,4 +1,3 @@
-
 import { ThumbsUp, ThumbsDown, MessageSquare, ExternalLink } from "lucide-react";
 import { Button } from "./ui/button";
 import { useState, useEffect } from "react";
@@ -40,85 +39,111 @@ export const VoteCard = ({
   const [newComment, setNewComment] = useState("");
   const [isLoadingComments, setIsLoadingComments] = useState(false);
 
-  // Carregar voto do usuário do localStorage
-  const [userVote, setUserVote] = useState<"up" | "down" | null>(() => {
-    const savedVote = localStorage.getItem(`vote_${id}`);
-    return savedVote as "up" | "down" | null;
-  });
-
-  // Carregar comentários quando showComments for true
   useEffect(() => {
-    if (showComments) {
-      fetchComments();
+    if (!localStorage.getItem('user_id')) {
+      localStorage.setItem('user_id', crypto.randomUUID());
     }
-  }, [showComments]);
+  }, []);
 
-  const fetchComments = async () => {
-    if (!showComments) return;
-    
-    setIsLoadingComments(true);
-    try {
+  const [userVote, setUserVote] = useState<"up" | "down" | null>(null);
+
+  useEffect(() => {
+    const fetchUserVote = async () => {
+      const userId = localStorage.getItem('user_id');
+      if (!userId) return;
+
       const { data, error } = await supabase
-        .from("comments")
-        .select("*")
-        .eq("topic_id", id)
-        .order("created_at", { ascending: false });
+        .from('votes')
+        .select('vote_type')
+        .eq('topic_id', id)
+        .eq('user_id', userId)
+        .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching user vote:', error);
+        return;
+      }
 
-      const commentsWithUserVotes = data.map(comment => ({
-        ...comment,
-        userVote: null,
-      }));
+      if (data) {
+        setUserVote(data.vote_type as "up" | "down");
+      }
+    };
 
-      setComments(commentsWithUserVotes);
+    fetchUserVote();
+  }, [id]);
+
+  const handleVote = async (type: "up" | "down") => {
+    const userId = localStorage.getItem('user_id');
+    if (!userId) return;
+
+    try {
+      if (userVote === type) {
+        // Remove o voto
+        const { error } = await supabase
+          .from('votes')
+          .delete()
+          .eq('topic_id', id)
+          .eq('user_id', userId);
+
+        if (error) throw error;
+
+        setUserVote(null);
+        if (type === "up") {
+          setUpvotes((prev) => prev - 1);
+        } else {
+          setDownvotes((prev) => prev - 1);
+        }
+
+        toast({
+          title: "Voto removido",
+          description: "Seu voto foi removido com sucesso.",
+        });
+      } else {
+        // Remove voto anterior se existir
+        if (userVote) {
+          await supabase
+            .from('votes')
+            .delete()
+            .eq('topic_id', id)
+            .eq('user_id', userId);
+
+          if (userVote === "up") {
+            setUpvotes((prev) => prev - 1);
+          } else {
+            setDownvotes((prev) => prev - 1);
+          }
+        }
+
+        // Adiciona novo voto
+        const { error } = await supabase
+          .from('votes')
+          .insert([
+            {
+              topic_id: id,
+              user_id: userId,
+              vote_type: type,
+            },
+          ]);
+
+        if (error) throw error;
+
+        setUserVote(type);
+        if (type === "up") {
+          setUpvotes((prev) => prev + 1);
+        } else {
+          setDownvotes((prev) => prev + 1);
+        }
+
+        toast({
+          title: "Voto registrado",
+          description: "Seu voto foi registrado com sucesso.",
+        });
+      }
     } catch (error) {
-      console.error("Error fetching comments:", error);
+      console.error('Error handling vote:', error);
       toast({
-        title: "Erro ao carregar comentários",
-        description: "Não foi possível carregar os comentários. Tente novamente mais tarde.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoadingComments(false);
-    }
-  };
-
-  const handleVote = (type: "up" | "down") => {
-    // Verifica se já votou neste tópico
-    const savedVote = localStorage.getItem(`vote_${id}`);
-    
-    if (savedVote === type) {
-      // Remove o voto
-      localStorage.removeItem(`vote_${id}`);
-      setUserVote(null);
-      if (type === "up") {
-        setUpvotes((prev) => prev - 1);
-      } else {
-        setDownvotes((prev) => prev - 1);
-      }
-      toast({
-        title: "Voto removido",
-        description: "Seu voto foi removido com sucesso.",
-      });
-    } else if (!savedVote) {
-      // Adiciona novo voto
-      localStorage.setItem(`vote_${id}`, type);
-      setUserVote(type);
-      if (type === "up") {
-        setUpvotes((prev) => prev + 1);
-      } else {
-        setDownvotes((prev) => prev + 1);
-      }
-      toast({
-        title: "Voto registrado",
-        description: "Seu voto foi registrado com sucesso.",
-      });
-    } else {
-      // Usuário já votou neste tópico
-      toast({
-        title: "Não é possível votar novamente",
-        description: "Você já votou neste tópico. Remova seu voto anterior primeiro.",
+        title: "Erro ao processar voto",
+        description: "Não foi possível processar seu voto. Tente novamente mais tarde.",
         variant: "destructive",
       });
     }
