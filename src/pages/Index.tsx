@@ -8,16 +8,12 @@ const Index = () => {
   const { data: topics, isLoading } = useQuery({
     queryKey: ['topics'],
     queryFn: async () => {
-      // Buscar tópicos com contagem de votos e comentários
       const { data, error } = await supabase
         .from('topics')
         .select(`
           *,
-          comments (count),
-          votes (
-            vote_type,
-            count
-          )
+          votes:votes(vote_type),
+          comments(count)
         `)
         .order('created_at', { ascending: false });
 
